@@ -123,7 +123,7 @@ function NutritionistView({ data: loaderData }: { data: any }) {
       );
 
       showToast(getRandomPhrase());
-      setBankOpen(false);
+
     },
     [fetcher, showToast]
   );

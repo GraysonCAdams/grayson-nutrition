@@ -91,7 +91,7 @@ export default function ClientView() {
       );
 
       showToast(getRandomPhrase());
-      setBankOpen(false);
+
     },
     [fetcher, todayStr, showToast]
   );
