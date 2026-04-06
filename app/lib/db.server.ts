@@ -1,0 +1,195 @@
+import Database from "better-sqlite3";
+import path from "path";
+import fs from "fs";
+import { SEED_ACTIVITIES } from "./constants";
+
+const DB_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), "data", "nutrition.db");
+
+let db: Database.Database;
+
+export function getDb(): Database.Database {
+  if (!db) {
+    const dir = path.dirname(DB_PATH);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    db = new Database(DB_PATH);
+    db.pragma("journal_mode = WAL");
+    db.pragma("foreign_keys = ON");
+    migrate(db);
+  }
+  return db;
+}
+
+function migrate(db: Database.Database) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS activities (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL CHECK(category IN ('baseline','weekly_challenge')),
+      color TEXT NOT NULL,
+      icon TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      active INTEGER NOT NULL DEFAULT 1,
+      baseline_week INTEGER,
+      max_per_day INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      activity_id INTEGER NOT NULL REFERENCES activities(id),
+      date TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS reviews (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      reviewed_at TEXT NOT NULL DEFAULT (datetime('now')),
+      notes TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+  `);
+
+  // Seed activities if empty
+  const count = db.prepare("SELECT COUNT(*) as count FROM activities").get() as { count: number };
+  if (count.count === 0) {
+    const insert = db.prepare(
+      "INSERT INTO activities (name, category, color, icon, sort_order, baseline_week, max_per_day) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    );
+    const seedMany = db.transaction(() => {
+      for (const a of SEED_ACTIVITIES) {
+        insert.run(a.name, a.category, a.color, a.icon, a.sort_order, a.baseline_week, a.max_per_day);
+      }
+    });
+    seedMany();
+  }
+}
+
+// Activity queries
+export function getAllActivities() {
+  return getDb().prepare("SELECT * FROM activities WHERE active = 1 ORDER BY category, sort_order").all() as Activity[];
+}
+
+export function getActivity(id: number) {
+  return getDb().prepare("SELECT * FROM activities WHERE id = ?").get(id) as Activity | undefined;
+}
+
+export function createActivity(data: { name: string; category: string; color: string; icon?: string; sort_order?: number }) {
+  const result = getDb().prepare(
+    "INSERT INTO activities (name, category, color, icon, sort_order) VALUES (?, ?, ?, ?, ?)"
+  ).run(data.name, data.category, data.color, data.icon || null, data.sort_order || 0);
+  return result.lastInsertRowid;
+}
+
+export function updateActivity(id: number, data: { name?: string; category?: string; color?: string; icon?: string; sort_order?: number; active?: number }) {
+  const fields: string[] = [];
+  const values: any[] = [];
+  for (const [key, val] of Object.entries(data)) {
+    if (val !== undefined) {
+      fields.push(`${key} = ?`);
+      values.push(val);
+    }
+  }
+  values.push(id);
+  getDb().prepare(`UPDATE activities SET ${fields.join(", ")} WHERE id = ?`).run(...values);
+}
+
+export function deleteActivity(id: number) {
+  getDb().prepare("UPDATE activities SET active = 0 WHERE id = ?").run(id);
+}
+
+// Entry queries
+export function getEntriesForDateRange(startDate: string, endDate: string) {
+  return getDb().prepare(`
+    SELECT e.*, a.name as activity_name, a.category, a.color, a.icon
+    FROM entries e
+    JOIN activities a ON e.activity_id = a.id
+    WHERE e.date >= ? AND e.date <= ?
+    ORDER BY e.date, a.category, a.sort_order
+  `).all(startDate, endDate) as EntryWithActivity[];
+}
+
+export function addEntry(activityId: number, date: string) {
+  // Check max_per_day limit
+  const activity = getActivity(activityId);
+  if (!activity) {
+    return { id: null, success: false, error: "Activity not found" };
+  }
+
+  const currentCount = getDb().prepare(
+    "SELECT COUNT(*) as count FROM entries WHERE activity_id = ? AND date = ?"
+  ).get(activityId, date) as { count: number };
+
+  if (currentCount.count >= activity.max_per_day) {
+    const label = activity.max_per_day === 1 ? "Already logged for this day" : `Already logged ${activity.max_per_day}x for this day`;
+    return { id: null, success: false, error: label };
+  }
+
+  const result = getDb().prepare(
+    "INSERT INTO entries (activity_id, date) VALUES (?, ?)"
+  ).run(activityId, date);
+  return { id: result.lastInsertRowid, success: true };
+}
+
+export function removeEntry(entryId: number) {
+  getDb().prepare("DELETE FROM entries WHERE id = ?").run(entryId);
+}
+
+// Review queries
+export function getLatestReview() {
+  return getDb().prepare("SELECT * FROM reviews ORDER BY reviewed_at DESC LIMIT 1").get() as Review | undefined;
+}
+
+export function markReview(notes?: string) {
+  getDb().prepare("INSERT INTO reviews (notes) VALUES (?)").run(notes || null);
+}
+
+// Settings queries
+export function getSetting(key: string): string | undefined {
+  const row = getDb().prepare("SELECT value FROM settings WHERE key = ?").get(key) as { value: string } | undefined;
+  return row?.value;
+}
+
+export function setSetting(key: string, value: string) {
+  getDb().prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run(key, value);
+}
+
+// Types
+export interface Activity {
+  id: number;
+  name: string;
+  category: string;
+  color: string;
+  icon: string | null;
+  sort_order: number;
+  active: number;
+  baseline_week: number | null;
+  max_per_day: number;
+  created_at: string;
+}
+
+export interface Entry {
+  id: number;
+  activity_id: number;
+  date: string;
+  created_at: string;
+}
+
+export interface EntryWithActivity extends Entry {
+  activity_name: string;
+  category: string;
+  color: string;
+  icon: string | null;
+}
+
+export interface Review {
+  id: number;
+  reviewed_at: string;
+  notes: string | null;
+}
