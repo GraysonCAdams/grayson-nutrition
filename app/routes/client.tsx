@@ -104,7 +104,7 @@ export default function ClientView() {
         {/* Header */}
         <div className="flex flex-col items-center gap-3 mb-4">
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-800">
-            Nutrition Tracker
+            Nourish
           </h1>
           <TabNav />
           <div className="flex items-center gap-3">
