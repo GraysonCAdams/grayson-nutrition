@@ -75,6 +75,20 @@ function migrate(db: Database.Database) {
     });
     seedMany();
   }
+
+  // Week 4 migration: rename water challenge, add new challenges
+  const waterChallenge = db.prepare("SELECT id FROM activities WHERE name = 'Drink water before coffee'").get() as { id: number } | undefined;
+  if (waterChallenge) {
+    db.prepare("UPDATE activities SET name = 'Drink water around coffee time' WHERE id = ?").run(waterChallenge.id);
+  }
+  const week4Check = db.prepare("SELECT COUNT(*) as count FROM activities WHERE baseline_week = 4").get() as { count: number };
+  if (week4Check.count === 0) {
+    const insert = db.prepare(
+      "INSERT INTO activities (name, category, color, icon, sort_order, baseline_week, max_per_day) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    );
+    insert.run("Mid-morning snack", "weekly_challenge", "#FBBF24", "🥜", 6, 4, 1);
+    insert.run("More balanced dessert", "weekly_challenge", "#34D399", "🍨", 7, 4, 1);
+  }
 }
 
 // Activity queries
@@ -92,10 +106,10 @@ export function findActivityByName(name: string): Activity | undefined {
   ).get(name) as Activity | undefined;
 }
 
-export function createActivity(data: { name: string; category: string; color: string; icon?: string; sort_order?: number }) {
+export function createActivity(data: { name: string; category: string; color: string; icon?: string; sort_order?: number; baseline_week?: number; max_per_day?: number }) {
   const result = getDb().prepare(
-    "INSERT INTO activities (name, category, color, icon, sort_order) VALUES (?, ?, ?, ?, ?)"
-  ).run(data.name, data.category, data.color, data.icon || null, data.sort_order || 0);
+    "INSERT INTO activities (name, category, color, icon, sort_order, baseline_week, max_per_day) VALUES (?, ?, ?, ?, ?, ?, ?)"
+  ).run(data.name, data.category, data.color, data.icon || null, data.sort_order || 0, data.baseline_week ?? null, data.max_per_day ?? 1);
   return result.lastInsertRowid;
 }
 

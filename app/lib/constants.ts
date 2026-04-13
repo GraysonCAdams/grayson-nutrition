@@ -55,10 +55,13 @@ export const SEED_ACTIVITIES = [
   { name: "Eat breakfast", category: "baseline", color: "#86EFAC", icon: "🍳", sort_order: 0, baseline_week: 1, max_per_day: 1 },
   { name: "Eat lunch", category: "baseline", color: "#86EFAC", icon: "🥗", sort_order: 1, baseline_week: null, max_per_day: 1 },
   { name: "Eat dinner", category: "baseline", color: "#86EFAC", icon: "🍽️", sort_order: 2, baseline_week: null, max_per_day: 1 },
-  { name: "Drink water before coffee", category: "weekly_challenge", color: "#38BDF8", icon: "💧", sort_order: 0, baseline_week: 3, max_per_day: 1 },
+  { name: "Drink water around coffee time", category: "weekly_challenge", color: "#38BDF8", icon: "💧", sort_order: 0, baseline_week: 3, max_per_day: 1 },
   { name: "Have a fruit", category: "weekly_challenge", color: "#F87171", icon: "🍎", sort_order: 1, baseline_week: 3, max_per_day: 5 },
   { name: "Protein food with breakfast", category: "weekly_challenge", color: "#A78BFA", icon: "🥚", sort_order: 2, baseline_week: 3, max_per_day: 1 },
   { name: "Protein snack before workout", category: "weekly_challenge", color: "#FB923C", icon: "🍌", sort_order: 3, baseline_week: 3, max_per_day: 3 },
   { name: "Work out at office", category: "weekly_challenge", color: "#2DD4BF", icon: "🏢", sort_order: 4, baseline_week: 3, max_per_day: 1 },
   { name: "Work out at home", category: "weekly_challenge", color: "#F472B6", icon: "🏠", sort_order: 5, baseline_week: 3, max_per_day: 1 },
+  // Week 4
+  { name: "Mid-morning snack", category: "weekly_challenge", color: "#FBBF24", icon: "🥜", sort_order: 6, baseline_week: 4, max_per_day: 1 },
+  { name: "More balanced dessert", category: "weekly_challenge", color: "#34D399", icon: "🍨", sort_order: 7, baseline_week: 4, max_per_day: 1 },
 ];

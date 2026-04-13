@@ -21,10 +21,12 @@ export async function action({ request }: Route.ActionArgs) {
     const category = String(formData.get("category"));
     const color = String(formData.get("color"));
     const icon = formData.get("icon") ? String(formData.get("icon")) : undefined;
+    const baseline_week = formData.get("baseline_week") ? Number(formData.get("baseline_week")) : undefined;
+    const max_per_day = formData.get("max_per_day") ? Number(formData.get("max_per_day")) : undefined;
     if (!name || !category || !color) {
       return data({ error: "Missing required fields" }, { status: 400 });
     }
-    const id = createActivity({ name, category, color, icon });
+    const id = createActivity({ name, category, color, icon, baseline_week, max_per_day });
     return data({ success: true, id });
   }
 
@@ -34,6 +36,10 @@ export async function action({ request }: Route.ActionArgs) {
     for (const field of ["name", "category", "color", "icon"]) {
       const val = formData.get(field);
       if (val !== null) updates[field] = String(val);
+    }
+    for (const field of ["baseline_week", "max_per_day", "sort_order"]) {
+      const val = formData.get(field);
+      if (val !== null) updates[field] = Number(val);
     }
     updateActivity(id, updates);
     return data({ success: true });
