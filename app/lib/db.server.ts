@@ -80,6 +80,12 @@ export function getActivity(id: number) {
   return getDb().prepare("SELECT * FROM activities WHERE id = ?").get(id) as Activity | undefined;
 }
 
+export function findActivityByName(name: string): Activity | undefined {
+  return getDb().prepare(
+    "SELECT * FROM activities WHERE LOWER(name) = LOWER(?) AND active = 1"
+  ).get(name) as Activity | undefined;
+}
+
 export function createActivity(data: { name: string; category: string; color: string; icon?: string; sort_order?: number }) {
   const result = getDb().prepare(
     "INSERT INTO activities (name, category, color, icon, sort_order) VALUES (?, ?, ?, ?, ?)"
