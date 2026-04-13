@@ -139,7 +139,7 @@ function MonthDayCell({ date, entries, isCurrentMonth, isToday, isSelected, onSe
 
       {/* Entry pills */}
       <div className="space-y-0.5">
-        {grouped.slice(0, 3).map((group) => (
+        {(isSelected ? grouped : grouped.slice(0, 3)).map((group) => (
           <div
             key={group.activityId}
             className="group relative flex items-center gap-1 px-1 py-0.5 rounded text-[10px] sm:text-xs leading-tight"
@@ -174,8 +174,8 @@ function MonthDayCell({ date, entries, isCurrentMonth, isToday, isSelected, onSe
             )}
           </div>
         ))}
-        {grouped.length > 3 && (
-          <div className="text-[10px] text-gray-400 pl-1">+{grouped.length - 3} more</div>
+        {!isSelected && grouped.length > 3 && (
+          <div className="text-[10px] text-indigo-500 font-medium pl-1 cursor-pointer">+{grouped.length - 3} more</div>
         )}
       </div>
     </div>
