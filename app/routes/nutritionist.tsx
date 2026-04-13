@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useLoaderData, useFetcher, Outlet, useLocation } from "react-router";
+import { useLoaderData, useFetcher, Outlet, useLocation, useNavigate } from "react-router";
 import { redirect } from "react-router";
 import {
   DndContext,
@@ -11,12 +11,11 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { getAllActivities, getEntriesForDateRange, getLatestReview, type Activity, type EntryWithActivity } from "~/lib/db.server";
-import { getWeekDates, today, formatMonthYear } from "~/lib/dates";
+import { getAllActivities, getEntriesForDateRange, getLatestReview, getActiveReleaseSession, type Activity, type EntryWithActivity } from "~/lib/db.server";
+import { today, formatMonthYearFromParts, getMonthCalendarGrid, getMonthCalendarRange } from "~/lib/dates";
 import { getRandomPhrase, CATEGORIES, ACTIVITY_COLORS, type Category } from "~/lib/constants";
 import { isNutritionistAuthenticated } from "~/lib/session.server";
-import { WeekStrip } from "~/components/WeekStrip";
-import { CalendarDay } from "~/components/CalendarDay";
+import { MonthCalendar } from "~/components/MonthCalendar";
 import { ActivityBank } from "~/components/ActivityBank";
 import { ActivityCardStatic } from "~/components/ActivityCard";
 import { DaysSinceReview } from "~/components/DaysSinceReview";
@@ -30,12 +29,12 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   // Allow access to login page without auth
   if (url.pathname === "/nutritionist/login") {
-    return { authenticated: false, activities: [], entries: [], weekDates: [], today: today(), lastReview: null };
+    return { authenticated: false, activities: [], entries: [], weeks: [] as string[][], month: 0, year: 0, today: today(), lastReview: null, releaseActive: false, releaseExpiresAt: null };
   }
 
   // Settings page handles its own auth
   if (url.pathname === "/nutritionist/settings") {
-    return { authenticated: true, activities: [], entries: [], weekDates: [], today: today(), lastReview: null };
+    return { authenticated: true, activities: [], entries: [], weeks: [] as string[][], month: 0, year: 0, today: today(), lastReview: null, releaseActive: false, releaseExpiresAt: null };
   }
 
   if (!isAuth) {
@@ -43,15 +42,35 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 
   const todayStr = today();
-  const weekDates = getWeekDates(todayStr);
+  const todayDate = new Date(todayStr + "T12:00:00");
+  const monthParam = url.searchParams.get("month"); // format: YYYY-MM
+  let year: number, month: number;
+
+  if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
+    const [y, m] = monthParam.split("-").map(Number);
+    year = y;
+    month = m - 1; // JS months are 0-indexed
+  } else {
+    year = todayDate.getFullYear();
+    month = todayDate.getMonth();
+  }
+
+  const weeks = getMonthCalendarGrid(year, month);
+  const [rangeStart, rangeEnd] = getMonthCalendarRange(weeks);
+
+  const releaseSession = getActiveReleaseSession();
 
   return {
     authenticated: true,
     activities: getAllActivities(),
-    entries: getEntriesForDateRange(weekDates[0], weekDates[6]),
-    weekDates,
+    entries: getEntriesForDateRange(rangeStart, rangeEnd),
+    weeks,
+    month,
+    year,
     today: todayStr,
     lastReview: getLatestReview(),
+    releaseActive: !!releaseSession,
+    releaseExpiresAt: releaseSession?.expires_at || null,
   };
 }
 
@@ -72,9 +91,11 @@ export default function NutritionistLayout() {
 }
 
 function NutritionistView({ data: loaderData }: { data: any }) {
-  const { activities, entries, weekDates, today: todayStr, lastReview } = loaderData;
+  const { activities, entries, weeks, month, year, today: todayStr, lastReview, releaseActive, releaseExpiresAt } = loaderData;
   const fetcher = useFetcher();
+  const releaseFetcher = useFetcher();
   const reviewFetcher = useFetcher();
+  const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [bankOpen, setBankOpen] = useState(true);
   const [showManager, setShowManager] = useState(false);
@@ -90,13 +111,11 @@ function NutritionistView({ data: loaderData }: { data: any }) {
     })
   );
 
-  const entriesByDate = weekDates.reduce(
-    (acc: Record<string, EntryWithActivity[]>, date: string) => {
-      acc[date] = entries.filter((e: EntryWithActivity) => e.date === date);
-      return acc;
-    },
-    {} as Record<string, EntryWithActivity[]>
-  );
+  const entriesByDate: Record<string, EntryWithActivity[]> = {};
+  for (const entry of entries) {
+    if (!entriesByDate[entry.date]) entriesByDate[entry.date] = [];
+    entriesByDate[entry.date].push(entry);
+  }
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const data = event.active.data.current;
@@ -123,7 +142,6 @@ function NutritionistView({ data: loaderData }: { data: any }) {
       );
 
       showToast(getRandomPhrase());
-
     },
     [fetcher, showToast]
   );
@@ -132,6 +150,40 @@ function NutritionistView({ data: loaderData }: { data: any }) {
     reviewFetcher.submit({}, { method: "post", action: "/api/review" });
     showToast("Review logged!");
   };
+
+  const handleRelease = () => {
+    releaseFetcher.submit(
+      { intent: "release", duration: "60" },
+      { method: "post", action: "/api/release" }
+    );
+    showToast("Released for review!");
+  };
+
+  const handleRevoke = () => {
+    releaseFetcher.submit(
+      { intent: "revoke" },
+      { method: "post", action: "/api/release" }
+    );
+  };
+
+  // Month navigation
+  const prevMonth = () => {
+    const m = month === 0 ? 11 : month - 1;
+    const y = month === 0 ? year - 1 : year;
+    navigate(`/nutritionist?month=${y}-${String(m + 1).padStart(2, "0")}`);
+  };
+  const nextMonth = () => {
+    const m = month === 11 ? 0 : month + 1;
+    const y = month === 11 ? year + 1 : year;
+    navigate(`/nutritionist?month=${y}-${String(m + 1).padStart(2, "0")}`);
+  };
+  const goToday = () => navigate("/nutritionist");
+
+  const todayDate = new Date(todayStr + "T12:00:00");
+  const isCurrentMonth = todayDate.getFullYear() === year && todayDate.getMonth() === month;
+
+  // Check if release is pending from fetcher
+  const isReleaseActive = releaseActive || releaseFetcher.data?.success;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
@@ -152,6 +204,21 @@ function NutritionistView({ data: loaderData }: { data: any }) {
             >
               Mark Reviewed
             </button>
+            {isReleaseActive ? (
+              <button
+                onClick={handleRevoke}
+                className="px-3 py-1.5 bg-red-100 text-red-700 text-xs sm:text-sm font-bold rounded-full hover:bg-red-200 active:scale-95 transition-all"
+              >
+                Revoke Access
+              </button>
+            ) : (
+              <button
+                onClick={handleRelease}
+                className="px-3 py-1.5 bg-indigo-500 text-white text-xs sm:text-sm font-bold rounded-full hover:bg-indigo-600 active:scale-95 transition-all shadow-sm"
+              >
+                Review Together
+              </button>
+            )}
             <button
               onClick={() => setShowManager(!showManager)}
               className="px-3 py-1.5 bg-gray-100 text-gray-700 text-xs sm:text-sm font-bold rounded-full hover:bg-gray-200 active:scale-95 transition-all"
@@ -165,6 +232,12 @@ function NutritionistView({ data: loaderData }: { data: any }) {
               Change Password
             </a>
           </div>
+          {isReleaseActive && (
+            <div className="text-xs text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full font-medium">
+              Client view unlocked
+              {releaseExpiresAt && ` until ${new Date(releaseExpiresAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`}
+            </div>
+          )}
         </div>
 
         {/* Activity Manager */}
@@ -172,48 +245,55 @@ function NutritionistView({ data: loaderData }: { data: any }) {
           <ActivityManager activities={activities} />
         )}
 
-        {/* Month label */}
-        <div className="text-center text-sm font-semibold text-gray-400 uppercase tracking-wider mb-1">
-          {formatMonthYear(todayStr)}
+        {/* Month navigation */}
+        <div className="flex items-center justify-center gap-4 mb-3">
+          <button
+            onClick={prevMonth}
+            className="p-1.5 rounded-full hover:bg-gray-100 active:scale-95 transition-all text-gray-400 hover:text-gray-600"
+            aria-label="Previous month"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div className="text-center min-w-[160px]">
+            <div className="text-sm font-semibold text-gray-600 uppercase tracking-wider">
+              {formatMonthYearFromParts(year, month)}
+            </div>
+            {!isCurrentMonth && (
+              <button
+                onClick={goToday}
+                className="text-xs text-indigo-500 hover:text-indigo-600 font-medium"
+              >
+                Back to today
+              </button>
+            )}
+          </div>
+          <button
+            onClick={nextMonth}
+            className="p-1.5 rounded-full hover:bg-gray-100 active:scale-95 transition-all text-gray-400 hover:text-gray-600"
+            aria-label="Next month"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
         </div>
 
-        {/* Week strip */}
-        <WeekStrip
-          dates={weekDates}
-          currentDate={selectedDate}
-          onDateSelect={setSelectedDate}
-          blurOtherDays={false}
-        />
-
-        {/* Main content */}
+        {/* Month calendar + drag context */}
         <DndContext
           sensors={sensors}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          {/* Calendar area */}
-          <div className="mt-4 pb-16">
-            {/* Mobile: show selected day */}
-            <div className="lg:hidden">
-              <CalendarDay
-                date={selectedDate}
-                entries={entriesByDate[selectedDate] || []}
-                isSelected={true}
-              />
-            </div>
-
-            {/* Desktop: full week grid */}
-            <div className="hidden lg:grid lg:grid-cols-7 gap-2">
-              {weekDates.map((date: string) => (
-                <CalendarDay
-                  key={date}
-                  date={date}
-                  entries={entriesByDate[date] || []}
-                  isSelected={date === selectedDate}
-                  onSelect={() => setSelectedDate(date)}
-                />
-              ))}
-            </div>
+          <div className="pb-16">
+            <MonthCalendar
+              weeks={weeks}
+              month={month}
+              entriesByDate={entriesByDate}
+              selectedDate={selectedDate}
+              onSelectDate={setSelectedDate}
+            />
           </div>
 
           {/* Bottom bank */}

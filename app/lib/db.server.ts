@@ -54,6 +54,12 @@ function migrate(db: Database.Database) {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS release_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 
   // Seed activities if empty
@@ -156,6 +162,25 @@ export function markReview(notes?: string) {
   getDb().prepare("INSERT INTO reviews (notes) VALUES (?)").run(notes || null);
 }
 
+// Release session queries
+export function createReleaseSession(durationMinutes: number = 60): ReleaseSession {
+  const expiresAt = new Date(Date.now() + durationMinutes * 60 * 1000).toISOString();
+  const result = getDb().prepare(
+    "INSERT INTO release_sessions (expires_at) VALUES (?)"
+  ).run(expiresAt);
+  return { id: Number(result.lastInsertRowid), expires_at: expiresAt, created_at: new Date().toISOString() };
+}
+
+export function getActiveReleaseSession(): ReleaseSession | undefined {
+  return getDb().prepare(
+    "SELECT * FROM release_sessions WHERE expires_at > datetime('now') ORDER BY created_at DESC LIMIT 1"
+  ).get() as ReleaseSession | undefined;
+}
+
+export function revokeReleaseSessions() {
+  getDb().prepare("DELETE FROM release_sessions").run();
+}
+
 // Settings queries
 export function getSetting(key: string): string | undefined {
   const row = getDb().prepare("SELECT value FROM settings WHERE key = ?").get(key) as { value: string } | undefined;
@@ -198,4 +223,10 @@ export interface Review {
   id: number;
   reviewed_at: string;
   notes: string | null;
+}
+
+export interface ReleaseSession {
+  id: number;
+  expires_at: string;
+  created_at: string;
 }

@@ -39,14 +39,15 @@ interface CalendarDayProps {
   isBlurred?: boolean;
   isSelected?: boolean;
   onSelect?: () => void;
+  allowFuture?: boolean;
 }
 
-export function CalendarDay({ date, entries, isBlurred, isSelected, onSelect }: CalendarDayProps) {
+export function CalendarDay({ date, entries, isBlurred, isSelected, onSelect, allowFuture }: CalendarDayProps) {
   const { isOver, setNodeRef } = useDroppable({ id: `day-${date}` });
   const fetcher = useFetcher();
   const todayStr = today();
   const isToday = date === todayStr;
-  const isFuture = date > todayStr;
+  const isFuture = date > todayStr && !allowFuture;
 
   const handleRemove = (entryId: number) => {
     fetcher.submit(
