@@ -5,6 +5,17 @@ export const CATEGORIES = {
 
 export type Category = keyof typeof CATEGORIES;
 
+export const TIMES_OF_DAY = {
+  morning: { label: "Morning", icon: "🌅", color: "#FDE68A" },
+  midday: { label: "Midday", icon: "🌞", color: "#FCA5A5" },
+  evening: { label: "Evening", icon: "🌙", color: "#A5B4FC" },
+  anytime: { label: "Anytime", icon: "✨", color: "#D1D5DB" },
+} as const;
+
+export type TimeOfDay = keyof typeof TIMES_OF_DAY;
+
+export const TIME_OF_DAY_ORDER: TimeOfDay[] = ["morning", "midday", "evening", "anytime"];
+
 export const ACTIVITY_COLORS: Record<string, string> = {
   green: "#86EFAC",
   amber: "#FCD34D",
@@ -60,21 +71,22 @@ export type SeedActivity = {
   baseline_week: number | null;
   max_per_day: number;
   notes: string | null;
+  time_of_day: TimeOfDay;
 };
 
 export const SEED_ACTIVITIES: SeedActivity[] = [
-  { name: "Eat breakfast", category: "baseline", color: "#86EFAC", icon: "🍳", sort_order: 0, baseline_week: 1, max_per_day: 1, notes: null },
-  { name: "Eat lunch", category: "baseline", color: "#86EFAC", icon: "🥗", sort_order: 1, baseline_week: null, max_per_day: 1, notes: null },
-  { name: "Eat dinner", category: "baseline", color: "#86EFAC", icon: "🍽️", sort_order: 2, baseline_week: null, max_per_day: 1, notes: null },
-  { name: "Drink water around coffee time", category: "weekly_challenge", color: "#38BDF8", icon: "💧", sort_order: 0, baseline_week: 3, max_per_day: 1, notes: null },
-  { name: "Have a fruit", category: "weekly_challenge", color: "#F87171", icon: "🍎", sort_order: 1, baseline_week: 3, max_per_day: 5, notes: null },
-  { name: "Protein food with breakfast", category: "weekly_challenge", color: "#A78BFA", icon: "🥚", sort_order: 2, baseline_week: 3, max_per_day: 1, notes: null },
-  { name: "Protein snack before workout", category: "weekly_challenge", color: "#FB923C", icon: "🍌", sort_order: 3, baseline_week: 3, max_per_day: 3, notes: null },
-  { name: "Work out at office", category: "weekly_challenge", color: "#2DD4BF", icon: "🏢", sort_order: 4, baseline_week: 3, max_per_day: 1, notes: null },
-  { name: "Work out at home", category: "weekly_challenge", color: "#F472B6", icon: "🏠", sort_order: 5, baseline_week: 3, max_per_day: 1, notes: null },
+  { name: "Eat breakfast", category: "baseline", color: "#86EFAC", icon: "🍳", sort_order: 0, baseline_week: 1, max_per_day: 1, notes: null, time_of_day: "morning" },
+  { name: "Eat lunch", category: "baseline", color: "#86EFAC", icon: "🥗", sort_order: 1, baseline_week: null, max_per_day: 1, notes: null, time_of_day: "midday" },
+  { name: "Eat dinner", category: "baseline", color: "#86EFAC", icon: "🍽️", sort_order: 2, baseline_week: null, max_per_day: 1, notes: null, time_of_day: "evening" },
+  { name: "Drink water around coffee time", category: "weekly_challenge", color: "#38BDF8", icon: "💧", sort_order: 0, baseline_week: 3, max_per_day: 1, notes: null, time_of_day: "morning" },
+  { name: "Have a fruit", category: "weekly_challenge", color: "#F87171", icon: "🍎", sort_order: 1, baseline_week: 3, max_per_day: 5, notes: null, time_of_day: "anytime" },
+  { name: "Protein food with breakfast", category: "weekly_challenge", color: "#A78BFA", icon: "🥚", sort_order: 2, baseline_week: 3, max_per_day: 1, notes: null, time_of_day: "morning" },
+  { name: "Protein snack before workout", category: "weekly_challenge", color: "#FB923C", icon: "🍌", sort_order: 3, baseline_week: 3, max_per_day: 3, notes: null, time_of_day: "anytime" },
+  { name: "Work out at office", category: "weekly_challenge", color: "#2DD4BF", icon: "🏢", sort_order: 4, baseline_week: 3, max_per_day: 1, notes: null, time_of_day: "midday" },
+  { name: "Work out at home", category: "weekly_challenge", color: "#F472B6", icon: "🏠", sort_order: 5, baseline_week: 3, max_per_day: 1, notes: null, time_of_day: "evening" },
   // Week 4
-  { name: "Mid-morning snack", category: "weekly_challenge", color: "#FBBF24", icon: "🥜", sort_order: 6, baseline_week: 4, max_per_day: 1, notes: null },
-  { name: "More balanced dessert", category: "weekly_challenge", color: "#34D399", icon: "🍨", sort_order: 7, baseline_week: 4, max_per_day: 1, notes: null },
-  { name: "Reflect before dessert", category: "weekly_challenge", color: "#F472B6", icon: "🍰", sort_order: 8, baseline_week: 4, max_per_day: 1, notes: "because it tastes good is valid" },
-  { name: "Bring a snack to work", category: "weekly_challenge", color: "#FB923C", icon: "🥨", sort_order: 9, baseline_week: 4, max_per_day: 1, notes: "chomp sticks + fruit, hummus cracker cups, chobani, banana" },
+  { name: "Mid-morning snack", category: "weekly_challenge", color: "#FBBF24", icon: "🥜", sort_order: 6, baseline_week: 4, max_per_day: 1, notes: null, time_of_day: "morning" },
+  { name: "More balanced dessert", category: "weekly_challenge", color: "#34D399", icon: "🍨", sort_order: 7, baseline_week: 4, max_per_day: 1, notes: null, time_of_day: "evening" },
+  { name: "Reflect before dessert", category: "weekly_challenge", color: "#F472B6", icon: "🍰", sort_order: 8, baseline_week: 4, max_per_day: 1, notes: "because it tastes good is valid", time_of_day: "evening" },
+  { name: "Bring a snack to work", category: "weekly_challenge", color: "#FB923C", icon: "🥨", sort_order: 9, baseline_week: 4, max_per_day: 1, notes: "chomp sticks + fruit, hummus cracker cups, chobani, banana", time_of_day: "morning" },
 ];

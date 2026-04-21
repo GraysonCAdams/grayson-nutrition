@@ -25,17 +25,19 @@ export async function action({ request }: Route.ActionArgs) {
     const max_per_day = formData.get("max_per_day") ? Number(formData.get("max_per_day")) : undefined;
     const notesRaw = formData.get("notes");
     const notes = notesRaw === null ? undefined : (String(notesRaw).trim() === "" ? null : String(notesRaw));
+    const timeOfDayRaw = formData.get("time_of_day");
+    const time_of_day = timeOfDayRaw ? String(timeOfDayRaw) : undefined;
     if (!name || !category || !color) {
       return data({ error: "Missing required fields" }, { status: 400 });
     }
-    const id = createActivity({ name, category, color, icon, baseline_week, max_per_day, notes });
+    const id = createActivity({ name, category, color, icon, baseline_week, max_per_day, notes, time_of_day });
     return data({ success: true, id });
   }
 
   if (intent === "update") {
     const id = Number(formData.get("id"));
     const updates: any = {};
-    for (const field of ["name", "category", "color", "icon"]) {
+    for (const field of ["name", "category", "color", "icon", "time_of_day"]) {
       const val = formData.get(field);
       if (val !== null) updates[field] = String(val);
     }

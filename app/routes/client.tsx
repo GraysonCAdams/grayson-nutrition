@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useLoaderData, useFetcher } from "react-router";
 import { getAllActivities, getCurrentRatings, type Activity } from "~/lib/db.server";
-import { CATEGORIES, type Category } from "~/lib/constants";
+import { TIMES_OF_DAY, TIME_OF_DAY_ORDER, type TimeOfDay } from "~/lib/constants";
 import { ActivityListItem } from "~/components/ActivityListItem";
 import type { Route } from "./+types/client";
 
@@ -16,50 +16,54 @@ export default function ClientView() {
   const { activities, currentRatings } = useLoaderData<typeof loader>();
 
   const grouped = useMemo(() => {
-    const g: Record<Category, Activity[]> = { baseline: [], weekly_challenge: [] };
+    const g: Record<TimeOfDay, Activity[]> = { morning: [], midday: [], evening: [], anytime: [] };
     for (const a of activities) {
-      const cat = a.category as Category;
-      if (!g[cat]) g[cat] = [];
-      g[cat].push(a);
+      const t = (a.time_of_day as TimeOfDay) || "anytime";
+      if (!g[t]) g[t] = [];
+      g[t].push(a);
+    }
+    for (const key of TIME_OF_DAY_ORDER) {
+      g[key].sort((x, y) => x.sort_order - y.sort_order);
     }
     return g;
   }, [activities]);
 
-  const categoryOrder: Category[] = ["baseline", "weekly_challenge"];
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
       <div
-        className="max-w-3xl mx-auto px-4 sm:px-6 pt-6 pb-12"
-        style={{ paddingBottom: "max(3rem, env(safe-area-inset-bottom))" }}
+        className="max-w-3xl mx-auto px-3 sm:px-5 pt-4 pb-8"
+        style={{ paddingBottom: "max(2rem, env(safe-area-inset-bottom))" }}
       >
-        <header className="mb-5 sm:mb-6 text-center">
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-800 tracking-tight">
+        <header className="mb-3 sm:mb-4 text-center">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-800 tracking-tight">
             Nourish
           </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Your nutrition activity bank — rate how on top of each habit you feel.
+          <p className="mt-0.5 text-[11px] sm:text-xs text-gray-500">
+            Rate how on top of each habit you feel.
           </p>
         </header>
 
-        <main className="space-y-6">
-          {categoryOrder.map((cat) => {
-            const items = grouped[cat];
+        <main className="space-y-3 sm:space-y-4">
+          {TIME_OF_DAY_ORDER.map((key) => {
+            const items = grouped[key];
             if (!items?.length) return null;
-            const info = CATEGORIES[cat];
+            const info = TIMES_OF_DAY[key];
             return (
-              <section key={cat}>
-                <div className="flex items-center gap-2 mb-2 px-1">
-                  <div
-                    className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: info.color }}
-                    aria-hidden="true"
-                  />
+              <section key={key}>
+                <div className="flex items-center gap-2 mb-1.5 px-0.5">
+                  <span className="text-base leading-none" aria-hidden="true">
+                    {info.icon}
+                  </span>
                   <h2 className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
                     {info.label}
                   </h2>
+                  <div
+                    className="flex-1 h-px"
+                    style={{ background: `linear-gradient(to right, ${info.color}66, transparent)` }}
+                    aria-hidden="true"
+                  />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {items.map((a) => (
                     <ActivityRow
                       key={a.id}
@@ -73,10 +77,10 @@ export default function ClientView() {
           })}
         </main>
 
-        <footer className="mt-10 pt-6 border-t border-gray-200 text-center">
+        <footer className="mt-6 pt-4 border-t border-gray-200 text-center">
           <a
             href="/nutritionist"
-            className="text-xs font-semibold text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-[11px] font-semibold text-gray-400 hover:text-gray-600 transition-colors"
           >
             Manage
           </a>

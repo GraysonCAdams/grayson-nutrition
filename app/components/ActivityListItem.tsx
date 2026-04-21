@@ -25,57 +25,48 @@ export function ActivityListItem({
   onRate,
 }: ActivityListItemProps) {
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-white shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+    <div className="relative rounded-xl bg-white shadow-sm border border-gray-100">
       <div
-        className="absolute left-0 top-0 bottom-0 w-1.5"
+        className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl"
         style={{ backgroundColor: color }}
         aria-hidden="true"
       />
-      <div
-        className="absolute inset-0 opacity-[0.04] pointer-events-none"
-        style={{ backgroundColor: color }}
-        aria-hidden="true"
-      />
-
-      <div className="relative px-4 py-3 sm:px-5 sm:py-4 pl-5 sm:pl-6">
-        <div className="flex items-start gap-3">
-          <span className="text-2xl sm:text-3xl leading-none shrink-0 mt-0.5" aria-hidden="true">
+      <div className="relative pl-3 pr-3 py-2 sm:py-2.5">
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          <span className="text-xl sm:text-2xl leading-none shrink-0" aria-hidden="true">
             {icon || "✨"}
           </span>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-3">
-              <h3 className="font-bold text-gray-800 text-base sm:text-lg leading-snug">
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-gray-800 text-sm sm:text-base leading-tight truncate">
                 {name}
               </h3>
-              <div className="flex items-center gap-1.5 shrink-0 pt-1">
-                {maxPerDay > 1 && (
-                  <span
-                    className="text-[10px] font-semibold text-gray-400 tabular-nums"
-                    title={`Ideal: ${maxPerDay}× per day`}
-                  >
-                    {maxPerDay >= 99 ? "∞×" : `${maxPerDay}×`}
-                  </span>
-                )}
-                {baselineWeek && <WeekDot week={baselineWeek} />}
-              </div>
+              {baselineWeek && <WeekDot week={baselineWeek} />}
+              {maxPerDay > 1 && (
+                <span
+                  className="text-[10px] font-bold text-gray-400 tabular-nums shrink-0"
+                  title={`Ideal: ${maxPerDay}× per day`}
+                >
+                  {maxPerDay >= 99 ? "∞×" : `${maxPerDay}×`}
+                </span>
+              )}
             </div>
-
             {notes && (
-              <p className="mt-1 text-sm text-gray-500 italic leading-relaxed">
+              <p className="mt-0.5 text-xs sm:text-[13px] text-gray-500 italic leading-snug">
                 {notes}
               </p>
             )}
+          </div>
 
-            <div className="mt-2 -mx-1">
-              <StarRating
-                value={rating}
-                pendingValue={pendingRating}
-                onChange={onRate}
-                size="md"
-                label={`How on top of "${name}" do you feel?`}
-              />
-            </div>
+          <div className="shrink-0">
+            <StarRating
+              value={rating}
+              pendingValue={pendingRating}
+              onChange={onRate}
+              size="sm"
+              label={`How on top of "${name}" do you feel?`}
+            />
           </div>
         </div>
       </div>

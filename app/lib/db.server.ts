@@ -35,6 +35,7 @@ function migrate(db: Database.Database) {
       baseline_week INTEGER,
       max_per_day INTEGER NOT NULL DEFAULT 1,
       notes TEXT,
+      time_of_day TEXT NOT NULL DEFAULT 'anytime',
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -79,20 +80,41 @@ function migrate(db: Database.Database) {
   const count = db.prepare("SELECT COUNT(*) as count FROM activities").get() as { count: number };
   if (count.count === 0) {
     const insert = db.prepare(
-      "INSERT INTO activities (name, category, color, icon, sort_order, baseline_week, max_per_day, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO activities (name, category, color, icon, sort_order, baseline_week, max_per_day, notes, time_of_day) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
     const seedMany = db.transaction(() => {
       for (const a of SEED_ACTIVITIES) {
-        insert.run(a.name, a.category, a.color, a.icon, a.sort_order, a.baseline_week, a.max_per_day, a.notes ?? null);
+        insert.run(
+          a.name,
+          a.category,
+          a.color,
+          a.icon,
+          a.sort_order,
+          a.baseline_week,
+          a.max_per_day,
+          a.notes ?? null,
+          a.time_of_day,
+        );
       }
     });
     seedMany();
   }
 
-  // Idempotent migration: ensure `notes` column exists on activities for older DBs.
+  // Idempotent migrations: ensure newer columns exist on activities for older DBs.
   const activityCols = db.prepare("PRAGMA table_info(activities)").all() as { name: string }[];
   if (!activityCols.some((c) => c.name === "notes")) {
     db.exec("ALTER TABLE activities ADD COLUMN notes TEXT");
+  }
+  if (!activityCols.some((c) => c.name === "time_of_day")) {
+    db.exec("ALTER TABLE activities ADD COLUMN time_of_day TEXT NOT NULL DEFAULT 'anytime'");
+    // Backfill time_of_day for existing known activities by name.
+    const backfill = db.prepare("UPDATE activities SET time_of_day = ? WHERE name = ? AND time_of_day = 'anytime'");
+    const seedMap = new Map<string, string>();
+    for (const a of SEED_ACTIVITIES) seedMap.set(a.name, a.time_of_day);
+    const tx = db.transaction(() => {
+      for (const [name, tod] of seedMap.entries()) backfill.run(tod, name);
+    });
+    tx();
   }
 
   // Week 4 migration: rename water challenge, add new challenges
@@ -110,18 +132,18 @@ function migrate(db: Database.Database) {
   }
 
   // Insert-if-missing for the two new activities + their notes.
-  const newActivities: Array<{ name: string; category: string; color: string; icon: string; sort_order: number; baseline_week: number | null; max_per_day: number; notes: string }> = [
-    { name: "Reflect before dessert", category: "weekly_challenge", color: "#F472B6", icon: "🍰", sort_order: 8, baseline_week: 4, max_per_day: 1, notes: "because it tastes good is valid" },
-    { name: "Bring a snack to work", category: "weekly_challenge", color: "#FB923C", icon: "🥨", sort_order: 9, baseline_week: 4, max_per_day: 1, notes: "chomp sticks + fruit, hummus cracker cups, chobani, banana" },
+  const newActivities: Array<{ name: string; category: string; color: string; icon: string; sort_order: number; baseline_week: number | null; max_per_day: number; notes: string; time_of_day: string }> = [
+    { name: "Reflect before dessert", category: "weekly_challenge", color: "#F472B6", icon: "🍰", sort_order: 8, baseline_week: 4, max_per_day: 1, notes: "because it tastes good is valid", time_of_day: "evening" },
+    { name: "Bring a snack to work", category: "weekly_challenge", color: "#FB923C", icon: "🥨", sort_order: 9, baseline_week: 4, max_per_day: 1, notes: "chomp sticks + fruit, hummus cracker cups, chobani, banana", time_of_day: "morning" },
   ];
   const existsStmt = db.prepare("SELECT id FROM activities WHERE name = ?");
-  const insertWithNotes = db.prepare(
-    "INSERT INTO activities (name, category, color, icon, sort_order, baseline_week, max_per_day, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+  const insertFull = db.prepare(
+    "INSERT INTO activities (name, category, color, icon, sort_order, baseline_week, max_per_day, notes, time_of_day) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
   );
   for (const a of newActivities) {
     const existing = existsStmt.get(a.name) as { id: number } | undefined;
     if (!existing) {
-      insertWithNotes.run(a.name, a.category, a.color, a.icon, a.sort_order, a.baseline_week, a.max_per_day, a.notes);
+      insertFull.run(a.name, a.category, a.color, a.icon, a.sort_order, a.baseline_week, a.max_per_day, a.notes, a.time_of_day);
     }
   }
 }
@@ -141,9 +163,9 @@ export function findActivityByName(name: string): Activity | undefined {
   ).get(name) as Activity | undefined;
 }
 
-export function createActivity(data: { name: string; category: string; color: string; icon?: string; sort_order?: number; baseline_week?: number; max_per_day?: number; notes?: string | null }) {
+export function createActivity(data: { name: string; category: string; color: string; icon?: string; sort_order?: number; baseline_week?: number; max_per_day?: number; notes?: string | null; time_of_day?: string }) {
   const result = getDb().prepare(
-    "INSERT INTO activities (name, category, color, icon, sort_order, baseline_week, max_per_day, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO activities (name, category, color, icon, sort_order, baseline_week, max_per_day, notes, time_of_day) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
   ).run(
     data.name,
     data.category,
@@ -153,11 +175,12 @@ export function createActivity(data: { name: string; category: string; color: st
     data.baseline_week ?? null,
     data.max_per_day ?? 1,
     data.notes ?? null,
+    data.time_of_day ?? "anytime",
   );
   return result.lastInsertRowid;
 }
 
-export function updateActivity(id: number, data: { name?: string; category?: string; color?: string; icon?: string; sort_order?: number; active?: number; baseline_week?: number | null; max_per_day?: number; notes?: string | null }) {
+export function updateActivity(id: number, data: { name?: string; category?: string; color?: string; icon?: string; sort_order?: number; active?: number; baseline_week?: number | null; max_per_day?: number; notes?: string | null; time_of_day?: string }) {
   const fields: string[] = [];
   const values: any[] = [];
   for (const [key, val] of Object.entries(data)) {
@@ -320,6 +343,7 @@ export interface Activity {
   baseline_week: number | null;
   max_per_day: number;
   notes: string | null;
+  time_of_day: string;
   created_at: string;
 }
 

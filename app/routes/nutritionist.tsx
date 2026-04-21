@@ -9,7 +9,15 @@ import {
   type ActivityRating,
 } from "~/lib/db.server";
 import { today } from "~/lib/dates";
-import { CATEGORIES, ACTIVITY_COLORS, WEEK_COLORS, type Category } from "~/lib/constants";
+import {
+  CATEGORIES,
+  ACTIVITY_COLORS,
+  WEEK_COLORS,
+  TIMES_OF_DAY,
+  TIME_OF_DAY_ORDER,
+  type Category,
+  type TimeOfDay,
+} from "~/lib/constants";
 import { isNutritionistAuthenticated } from "~/lib/session.server";
 import { RatingHistoryStrip } from "~/components/RatingHistoryStrip";
 import type { Route } from "./+types/nutritionist";
@@ -18,7 +26,6 @@ export async function loader({ request }: Route.LoaderArgs) {
   const isAuth = await isNutritionistAuthenticated(request);
   const url = new URL(request.url);
 
-  // Allow access to login page without auth
   if (url.pathname === "/nutritionist/login") {
     return {
       authenticated: false,
@@ -29,7 +36,6 @@ export async function loader({ request }: Route.LoaderArgs) {
     };
   }
 
-  // Settings page handles its own auth
   if (url.pathname === "/nutritionist/settings") {
     return {
       authenticated: true,
@@ -78,33 +84,30 @@ function NutritionistView({ data }: { data: any }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
       <div
-        className="max-w-4xl mx-auto px-4 sm:px-6 pt-6 pb-12"
-        style={{ paddingBottom: "max(3rem, env(safe-area-inset-bottom))" }}
+        className="max-w-4xl mx-auto px-3 sm:px-5 pt-4 pb-8"
+        style={{ paddingBottom: "max(2rem, env(safe-area-inset-bottom))" }}
       >
-        <header className="mb-5 sm:mb-6 text-center">
-          <div className="flex items-center justify-center gap-3 flex-wrap">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-800">
+        <header className="mb-3 sm:mb-4 text-center">
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            <h1 className="text-xl sm:text-2xl font-extrabold text-gray-800">
               Nourish
             </h1>
-            <span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 text-[11px] font-bold rounded-full uppercase tracking-wider">
+            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full uppercase tracking-wider">
               Nutritionist
             </span>
           </div>
-          <p className="mt-1 text-sm text-gray-500">
-            Manage activities and review rating history.
-          </p>
-          <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
+          <div className="mt-2 flex items-center justify-center gap-1.5 flex-wrap">
             <a
               href="/client"
-              className="px-3 py-1.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-full hover:bg-gray-200 active:scale-95 transition-all"
+              className="px-2.5 py-1 bg-gray-100 text-gray-700 text-[11px] font-bold rounded-full hover:bg-gray-200 active:scale-95 transition-all"
             >
-              View Client Page
+              View Client
             </a>
             <a
               href="/nutritionist/settings"
-              className="px-3 py-1.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-full hover:bg-gray-200 active:scale-95 transition-all"
+              className="px-2.5 py-1 bg-gray-100 text-gray-700 text-[11px] font-bold rounded-full hover:bg-gray-200 active:scale-95 transition-all"
             >
-              Change Password
+              Password
             </a>
           </div>
         </header>
@@ -137,6 +140,7 @@ function ActivityManager({
   const [newBaselineWeek, setNewBaselineWeek] = useState<string>("");
   const [newMaxPerDay, setNewMaxPerDay] = useState("1");
   const [newNotes, setNewNotes] = useState("");
+  const [newTimeOfDay, setNewTimeOfDay] = useState<TimeOfDay>("anytime");
 
   const [editingId, setEditingId] = useState<number | null>(null);
 
@@ -148,6 +152,7 @@ function ActivityManager({
       category: newCategory,
       color: newColor,
       max_per_day: newMaxPerDay || "1",
+      time_of_day: newTimeOfDay,
     };
     if (newIcon) fd.icon = newIcon;
     if (newBaselineWeek) fd.baseline_week = newBaselineWeek;
@@ -158,6 +163,7 @@ function ActivityManager({
     setNewBaselineWeek("");
     setNewMaxPerDay("1");
     setNewNotes("");
+    setNewTimeOfDay("anytime");
     setShowAdd(false);
   };
 
@@ -168,112 +174,97 @@ function ActivityManager({
     );
   };
 
-  const categoryOrder: Category[] = ["baseline", "weekly_challenge"];
-  const grouped: Record<Category, Activity[]> = { baseline: [], weekly_challenge: [] };
+  const grouped: Record<TimeOfDay, Activity[]> = { morning: [], midday: [], evening: [], anytime: [] };
   for (const a of activities) {
-    const cat = a.category as Category;
-    if (!grouped[cat]) grouped[cat] = [];
-    grouped[cat].push(a);
+    const t = (a.time_of_day as TimeOfDay) || "anytime";
+    if (!grouped[t]) grouped[t] = [];
+    grouped[t].push(a);
+  }
+  for (const key of TIME_OF_DAY_ORDER) {
+    grouped[key].sort((x, y) => x.sort_order - y.sort_order);
   }
 
   return (
-    <div className="space-y-6">
-      {/* Add new activity */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-5">
+    <div className="space-y-3">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 sm:p-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-gray-800">Add activity</h2>
           <button
             type="button"
             onClick={() => setShowAdd(!showAdd)}
-            className="px-3 py-1.5 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-full hover:bg-indigo-200 active:scale-95 transition-all"
+            className="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-[11px] font-bold rounded-full hover:bg-indigo-200 active:scale-95 transition-all"
           >
             {showAdd ? "Cancel" : "New"}
           </button>
         </div>
 
         {showAdd && (
-          <div className="mt-4 space-y-3">
-            <div className="flex flex-wrap gap-2">
+          <div className="mt-3 space-y-2.5">
+            <div className="flex flex-wrap gap-1.5">
               <input
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="Activity name"
-                className="flex-1 min-w-[160px] px-3 py-2 rounded-xl border border-gray-200 text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none"
+                className="flex-1 min-w-[160px] px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none"
               />
               <input
                 type="text"
                 value={newIcon}
                 onChange={(e) => setNewIcon(e.target.value)}
                 placeholder="🍎"
-                className="w-16 px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:border-indigo-400 outline-none"
+                className="w-14 px-2 py-1.5 rounded-lg border border-gray-200 text-sm text-center focus:border-indigo-400 outline-none"
               />
-              <select
-                value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value as Category)}
-                className="px-3 py-2 rounded-xl border border-gray-200 text-sm focus:border-indigo-400 outline-none"
-              >
-                {categoryOrder.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {CATEGORIES[cat].label}
-                  </option>
-                ))}
-              </select>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-semibold text-gray-500">Color</span>
-                <div className="flex items-center gap-1">
-                  {Object.entries(ACTIVITY_COLORS).map(([name, hex]) => (
-                    <button
-                      key={name}
-                      type="button"
-                      onClick={() => setNewColor(hex)}
-                      aria-label={name}
-                      className={`w-7 h-7 rounded-full transition-all ${
-                        newColor === hex ? "ring-2 ring-offset-1 ring-indigo-400 scale-110" : "hover:scale-110"
-                      }`}
-                      style={{ backgroundColor: hex }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <label className="flex items-center gap-1.5 text-xs">
-                <span className="font-semibold text-gray-500">Week</span>
+            <div className="flex flex-wrap items-center gap-2 text-[11px]">
+              <TimeOfDayPicker value={newTimeOfDay} onChange={setNewTimeOfDay} />
+              <label className="flex items-center gap-1">
+                <span className="font-semibold text-gray-500">Cat</span>
                 <select
-                  value={newBaselineWeek}
-                  onChange={(e) => setNewBaselineWeek(e.target.value)}
-                  className="px-2 py-1.5 rounded-lg border border-gray-200 text-xs focus:border-indigo-400 outline-none"
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value as Category)}
+                  className="px-2 py-1 rounded-lg border border-gray-200 text-[11px] focus:border-indigo-400 outline-none"
                 >
-                  <option value="">—</option>
-                  {Object.keys(WEEK_COLORS).map((w) => (
-                    <option key={w} value={w}>
-                      Week {w}
+                  {(["baseline", "weekly_challenge"] as Category[]).map((cat) => (
+                    <option key={cat} value={cat}>
+                      {CATEGORIES[cat].label}
                     </option>
                   ))}
                 </select>
               </label>
-
-              <label className="flex items-center gap-1.5 text-xs">
-                <span className="font-semibold text-gray-500">Max/day</span>
+              <label className="flex items-center gap-1">
+                <span className="font-semibold text-gray-500">Week</span>
+                <select
+                  value={newBaselineWeek}
+                  onChange={(e) => setNewBaselineWeek(e.target.value)}
+                  className="px-2 py-1 rounded-lg border border-gray-200 text-[11px] focus:border-indigo-400 outline-none"
+                >
+                  <option value="">—</option>
+                  {Object.keys(WEEK_COLORS).map((w) => (
+                    <option key={w} value={w}>W{w}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-1">
+                <span className="font-semibold text-gray-500">/day</span>
                 <input
                   type="number"
                   min={1}
                   value={newMaxPerDay}
                   onChange={(e) => setNewMaxPerDay(e.target.value)}
-                  className="w-16 px-2 py-1.5 rounded-lg border border-gray-200 text-xs focus:border-indigo-400 outline-none"
+                  className="w-12 px-1.5 py-1 rounded-lg border border-gray-200 text-[11px] focus:border-indigo-400 outline-none"
                 />
               </label>
+              <ColorPicker value={newColor} onChange={setNewColor} />
             </div>
 
             <textarea
               value={newNotes}
               onChange={(e) => setNewNotes(e.target.value)}
-              placeholder="Notes (shown under the activity name on the client page)"
+              placeholder="Notes (shown under activity name)"
               rows={2}
-              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none resize-y"
+              className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none resize-y"
             />
 
             <div className="flex justify-end">
@@ -281,33 +272,33 @@ function ActivityManager({
                 type="button"
                 onClick={handleAdd}
                 disabled={!newName.trim()}
-                className="px-4 py-2 bg-indigo-500 text-white text-sm font-bold rounded-xl hover:bg-indigo-600 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 bg-indigo-500 text-white text-sm font-bold rounded-lg hover:bg-indigo-600 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                Add activity
+                Add
               </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Existing activities grouped */}
-      {categoryOrder.map((cat) => {
-        const items = grouped[cat];
+      {TIME_OF_DAY_ORDER.map((key) => {
+        const items = grouped[key];
         if (!items?.length) return null;
-        const info = CATEGORIES[cat];
+        const info = TIMES_OF_DAY[key];
         return (
-          <section key={cat}>
-            <div className="flex items-center gap-2 mb-2 px-1">
-              <div
-                className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: info.color }}
-                aria-hidden="true"
-              />
+          <section key={key}>
+            <div className="flex items-center gap-2 mb-1.5 px-0.5">
+              <span className="text-base leading-none" aria-hidden="true">{info.icon}</span>
               <h2 className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
                 {info.label}
               </h2>
+              <div
+                className="flex-1 h-px"
+                style={{ background: `linear-gradient(to right, ${info.color}66, transparent)` }}
+                aria-hidden="true"
+              />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {items.map((a) => (
                 <ActivityAdminRow
                   key={a.id}
@@ -324,6 +315,44 @@ function ActivityManager({
           </section>
         );
       })}
+    </div>
+  );
+}
+
+function TimeOfDayPicker({ value, onChange }: { value: TimeOfDay; onChange: (v: TimeOfDay) => void }) {
+  return (
+    <label className="flex items-center gap-1">
+      <span className="font-semibold text-gray-500">Time</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value as TimeOfDay)}
+        className="px-2 py-1 rounded-lg border border-gray-200 text-[11px] focus:border-indigo-400 outline-none"
+      >
+        {TIME_OF_DAY_ORDER.map((k) => (
+          <option key={k} value={k}>
+            {TIMES_OF_DAY[k].icon} {TIMES_OF_DAY[k].label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function ColorPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex items-center gap-1">
+      {Object.entries(ACTIVITY_COLORS).map(([name, hex]) => (
+        <button
+          key={name}
+          type="button"
+          onClick={() => onChange(hex)}
+          aria-label={name}
+          className={`w-5 h-5 rounded-full transition-all ${
+            value === hex ? "ring-2 ring-offset-1 ring-indigo-400 scale-110" : "hover:scale-110"
+          }`}
+          style={{ backgroundColor: hex }}
+        />
+      ))}
     </div>
   );
 }
@@ -356,83 +385,85 @@ function ActivityAdminRow({
   }
 
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-white shadow-sm border border-gray-100">
+    <div className="relative rounded-xl bg-white shadow-sm border border-gray-100">
       <div
-        className="absolute left-0 top-0 bottom-0 w-1.5"
+        className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl"
         style={{ backgroundColor: activity.color }}
         aria-hidden="true"
       />
-      <div className="relative px-4 py-3 sm:px-5 sm:py-4 pl-5 sm:pl-6">
-        <div className="flex items-start gap-3">
-          <span className="text-xl sm:text-2xl leading-none shrink-0 mt-0.5" aria-hidden="true">
+      <div className="relative pl-3 pr-2.5 py-2 sm:py-2.5">
+        <div className="flex items-center gap-2.5">
+          <span className="text-lg sm:text-xl leading-none shrink-0" aria-hidden="true">
             {activity.icon || "✨"}
           </span>
           <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h3 className="font-bold text-gray-800 text-sm sm:text-base leading-snug">
-                  {activity.name}
-                </h3>
-                {activity.notes && (
-                  <p className="mt-0.5 text-xs text-gray-500 italic leading-relaxed">
-                    {activity.notes}
-                  </p>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-gray-800 text-sm sm:text-[15px] leading-tight truncate">
+                {activity.name}
+              </h3>
+              {activity.baseline_week && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-gray-50 border border-gray-100 text-[10px] font-bold text-gray-600 tabular-nums leading-none shrink-0">
+                  W{activity.baseline_week}
+                </span>
+              )}
+              {activity.max_per_day > 1 && (
+                <span className="text-[10px] font-bold text-gray-400 tabular-nums shrink-0">
+                  {activity.max_per_day >= 99 ? "∞×" : `${activity.max_per_day}×`}
+                </span>
+              )}
+            </div>
+            {activity.notes && (
+              <p className="mt-0.5 text-[12px] text-gray-500 italic leading-snug truncate">
+                {activity.notes}
+              </p>
+            )}
+            <div className="mt-1 flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  Now
+                </span>
+                {currentRating ? (
+                  <div className="flex items-center gap-0.5">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <span
+                        key={n}
+                        className={`text-xs leading-none ${n <= currentRating ? "text-amber-400" : "text-gray-300"}`}
+                        aria-hidden="true"
+                      >
+                        {n <= currentRating ? "★" : "☆"}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-[11px] text-gray-400 italic">—</span>
                 )}
               </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={onToggleEdit}
-                  className="px-2.5 py-1 text-[11px] font-bold text-gray-600 bg-gray-100 rounded-full hover:bg-gray-200 active:scale-95 transition-all"
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={onDelete}
-                  aria-label="Delete activity"
-                  className="p-1.5 text-gray-400 hover:text-red-500 active:scale-95 transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    />
-                  </svg>
-                </button>
-              </div>
+              <RatingHistoryStrip history={history} />
             </div>
-
-            <div className="mt-2 flex items-start gap-3 flex-wrap">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                  Current
-                </span>
-                <div className="flex items-center gap-0.5">
-                  {currentRating
-                    ? [1, 2, 3, 4, 5].map((n) => (
-                        <span
-                          key={n}
-                          className={`text-sm ${n <= currentRating ? "text-amber-400" : "text-gray-300"}`}
-                          aria-hidden="true"
-                        >
-                          {n <= currentRating ? "★" : "☆"}
-                        </span>
-                      ))
-                    : (
-                      <span className="text-xs text-gray-400 italic">not rated</span>
-                    )}
-                </div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
-                  History
-                </div>
-                <RatingHistoryStrip history={history} />
-              </div>
-            </div>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={onToggleEdit}
+              className="px-2 py-1 text-[11px] font-bold text-gray-600 bg-gray-100 rounded-full hover:bg-gray-200 active:scale-95 transition-all"
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              aria-label="Delete activity"
+              className="p-1.5 text-gray-400 hover:text-red-500 active:scale-95 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              </svg>
+            </button>
           </div>
         </div>
       </div>
@@ -459,6 +490,7 @@ function ActivityEditForm({
   );
   const [maxPerDay, setMaxPerDay] = useState(String(activity.max_per_day));
   const [notes, setNotes] = useState(activity.notes ?? "");
+  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>((activity.time_of_day as TimeOfDay) || "anytime");
 
   const handleSave = () => {
     fetcher.submit(
@@ -472,110 +504,93 @@ function ActivityEditForm({
         baseline_week: baselineWeek || "",
         max_per_day: maxPerDay || "1",
         notes,
+        time_of_day: timeOfDay,
       } as Record<string, string>,
       { method: "post", action: "/api/activities" }
     );
     onSaved();
   };
 
-  const categoryOrder: Category[] = ["baseline", "weekly_challenge"];
-
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-white shadow-sm border-2 border-indigo-200">
+    <div className="relative rounded-xl bg-white shadow-sm border-2 border-indigo-200">
       <div
-        className="absolute left-0 top-0 bottom-0 w-1.5"
+        className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl"
         style={{ backgroundColor: color }}
         aria-hidden="true"
       />
-      <div className="relative px-4 py-4 sm:px-5 sm:py-5 pl-5 sm:pl-6 space-y-3">
-        <div className="flex flex-wrap gap-2">
+      <div className="relative pl-3 pr-3 py-3 space-y-2">
+        <div className="flex flex-wrap gap-1.5">
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Name"
-            className="flex-1 min-w-[160px] px-3 py-2 rounded-xl border border-gray-200 text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none"
+            className="flex-1 min-w-[160px] px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none"
           />
           <input
             type="text"
             value={icon}
             onChange={(e) => setIcon(e.target.value)}
             placeholder="🍎"
-            className="w-16 px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:border-indigo-400 outline-none"
+            className="w-14 px-2 py-1.5 rounded-lg border border-gray-200 text-sm text-center focus:border-indigo-400 outline-none"
           />
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value as Category)}
-            className="px-3 py-2 rounded-xl border border-gray-200 text-sm focus:border-indigo-400 outline-none"
-          >
-            {categoryOrder.map((c) => (
-              <option key={c} value={c}>
-                {CATEGORIES[c].label}
-              </option>
-            ))}
-          </select>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-gray-500">Color</span>
-            <div className="flex items-center gap-1">
-              {Object.entries(ACTIVITY_COLORS).map(([n, hex]) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setColor(hex)}
-                  aria-label={n}
-                  className={`w-7 h-7 rounded-full transition-all ${
-                    color === hex ? "ring-2 ring-offset-1 ring-indigo-400 scale-110" : "hover:scale-110"
-                  }`}
-                  style={{ backgroundColor: hex }}
-                />
-              ))}
-            </div>
-          </div>
-
-          <label className="flex items-center gap-1.5 text-xs">
-            <span className="font-semibold text-gray-500">Week</span>
+        <div className="flex flex-wrap items-center gap-2 text-[11px]">
+          <TimeOfDayPicker value={timeOfDay} onChange={setTimeOfDay} />
+          <label className="flex items-center gap-1">
+            <span className="font-semibold text-gray-500">Cat</span>
             <select
-              value={baselineWeek}
-              onChange={(e) => setBaselineWeek(e.target.value)}
-              className="px-2 py-1.5 rounded-lg border border-gray-200 text-xs focus:border-indigo-400 outline-none"
+              value={category}
+              onChange={(e) => setCategory(e.target.value as Category)}
+              className="px-2 py-1 rounded-lg border border-gray-200 text-[11px] focus:border-indigo-400 outline-none"
             >
-              <option value="">—</option>
-              {Object.keys(WEEK_COLORS).map((w) => (
-                <option key={w} value={w}>
-                  Week {w}
+              {(["baseline", "weekly_challenge"] as Category[]).map((c) => (
+                <option key={c} value={c}>
+                  {CATEGORIES[c].label}
                 </option>
               ))}
             </select>
           </label>
-
-          <label className="flex items-center gap-1.5 text-xs">
-            <span className="font-semibold text-gray-500">Max/day</span>
+          <label className="flex items-center gap-1">
+            <span className="font-semibold text-gray-500">Week</span>
+            <select
+              value={baselineWeek}
+              onChange={(e) => setBaselineWeek(e.target.value)}
+              className="px-2 py-1 rounded-lg border border-gray-200 text-[11px] focus:border-indigo-400 outline-none"
+            >
+              <option value="">—</option>
+              {Object.keys(WEEK_COLORS).map((w) => (
+                <option key={w} value={w}>W{w}</option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-1">
+            <span className="font-semibold text-gray-500">/day</span>
             <input
               type="number"
               min={1}
               value={maxPerDay}
               onChange={(e) => setMaxPerDay(e.target.value)}
-              className="w-16 px-2 py-1.5 rounded-lg border border-gray-200 text-xs focus:border-indigo-400 outline-none"
+              className="w-12 px-1.5 py-1 rounded-lg border border-gray-200 text-[11px] focus:border-indigo-400 outline-none"
             />
           </label>
+          <ColorPicker value={color} onChange={setColor} />
         </div>
 
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Notes (italic sub-line on the client page)"
+          placeholder="Notes"
           rows={2}
-          className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none resize-y"
+          className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none resize-y"
         />
 
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-1.5">
           <button
             type="button"
             onClick={onCancel}
-            className="px-3 py-1.5 text-sm font-bold text-gray-600 bg-gray-100 rounded-full hover:bg-gray-200 active:scale-95 transition-all"
+            className="px-2.5 py-1 text-[11px] font-bold text-gray-600 bg-gray-100 rounded-full hover:bg-gray-200 active:scale-95 transition-all"
           >
             Cancel
           </button>
@@ -583,7 +598,7 @@ function ActivityEditForm({
             type="button"
             onClick={handleSave}
             disabled={!name.trim()}
-            className="px-4 py-1.5 text-sm font-bold text-white bg-indigo-500 rounded-full hover:bg-indigo-600 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-3 py-1 text-[11px] font-bold text-white bg-indigo-500 rounded-full hover:bg-indigo-600 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Save
           </button>

@@ -9,17 +9,17 @@ interface StarRatingProps {
   label?: string;
 }
 
-export function StarRating({ value, pendingValue, onChange, size = "md", disabled, label }: StarRatingProps) {
+export function StarRating({ value, pendingValue, onChange, size = "sm", disabled, label }: StarRatingProps) {
   const [hoverValue, setHoverValue] = useState<number | null>(null);
   const displayValue = hoverValue ?? pendingValue ?? value ?? 0;
 
-  // Keep tap targets large enough for thumbs on mobile (min 44x44 per iOS HIG).
-  const buttonSize = size === "sm" ? "w-10 h-10" : "w-11 h-11";
-  const iconSize = size === "sm" ? "text-xl" : "text-2xl";
+  // Stars themselves are small, but each button keeps a >=40px tap area via padding.
+  const buttonSize = size === "sm" ? "w-9 h-9" : "w-11 h-11";
+  const iconSize = size === "sm" ? "text-lg" : "text-2xl";
 
   return (
     <div
-      className="flex items-center gap-0.5"
+      className="flex items-center -mx-1"
       role="radiogroup"
       aria-label={label ?? "Star rating"}
     >
@@ -42,7 +42,7 @@ export function StarRating({ value, pendingValue, onChange, size = "md", disable
               if (!disabled) onChange(n);
             }}
             onPointerDown={(e) => e.stopPropagation()}
-            className={`${buttonSize} flex items-center justify-center rounded-lg
+            className={`${buttonSize} flex items-center justify-center rounded-md
               transition-transform active:scale-90
               ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-amber-50"}
               ${iconSize}
@@ -50,7 +50,7 @@ export function StarRating({ value, pendingValue, onChange, size = "md", disable
             style={{ touchAction: "manipulation" }}
           >
             <span
-              className={`transition-colors ${filled ? "text-amber-400 drop-shadow-sm" : "text-gray-300"}`}
+              className={`transition-colors leading-none ${filled ? "text-amber-400 drop-shadow-sm" : "text-gray-300"}`}
               aria-hidden="true"
             >
               {filled ? "★" : "☆"}
