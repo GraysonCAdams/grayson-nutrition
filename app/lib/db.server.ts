@@ -34,6 +34,7 @@ function migrate(db: Database.Database) {
       active INTEGER NOT NULL DEFAULT 1,
       baseline_week INTEGER,
       max_per_day INTEGER NOT NULL DEFAULT 1,
+      notes TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -60,20 +61,38 @@ function migrate(db: Database.Database) {
       expires_at TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS activity_ratings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      activity_id INTEGER NOT NULL REFERENCES activities(id),
+      rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+      rated_on TEXT NOT NULL,
+      rated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_activity_ratings_activity
+      ON activity_ratings(activity_id, rated_on DESC);
   `);
 
   // Seed activities if empty
   const count = db.prepare("SELECT COUNT(*) as count FROM activities").get() as { count: number };
   if (count.count === 0) {
     const insert = db.prepare(
-      "INSERT INTO activities (name, category, color, icon, sort_order, baseline_week, max_per_day) VALUES (?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO activities (name, category, color, icon, sort_order, baseline_week, max_per_day, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     );
     const seedMany = db.transaction(() => {
       for (const a of SEED_ACTIVITIES) {
-        insert.run(a.name, a.category, a.color, a.icon, a.sort_order, a.baseline_week, a.max_per_day);
+        insert.run(a.name, a.category, a.color, a.icon, a.sort_order, a.baseline_week, a.max_per_day, a.notes ?? null);
       }
     });
     seedMany();
+  }
+
+  // Idempotent migration: ensure `notes` column exists on activities for older DBs.
+  const activityCols = db.prepare("PRAGMA table_info(activities)").all() as { name: string }[];
+  if (!activityCols.some((c) => c.name === "notes")) {
+    db.exec("ALTER TABLE activities ADD COLUMN notes TEXT");
   }
 
   // Week 4 migration: rename water challenge, add new challenges
@@ -88,6 +107,22 @@ function migrate(db: Database.Database) {
     );
     insert.run("Mid-morning snack", "weekly_challenge", "#FBBF24", "🥜", 6, 4, 1);
     insert.run("More balanced dessert", "weekly_challenge", "#34D399", "🍨", 7, 4, 1);
+  }
+
+  // Insert-if-missing for the two new activities + their notes.
+  const newActivities: Array<{ name: string; category: string; color: string; icon: string; sort_order: number; baseline_week: number | null; max_per_day: number; notes: string }> = [
+    { name: "Reflect before dessert", category: "weekly_challenge", color: "#F472B6", icon: "🍰", sort_order: 8, baseline_week: 4, max_per_day: 1, notes: "because it tastes good is valid" },
+    { name: "Bring a snack to work", category: "weekly_challenge", color: "#FB923C", icon: "🥨", sort_order: 9, baseline_week: 4, max_per_day: 1, notes: "chomp sticks + fruit, hummus cracker cups, chobani, banana" },
+  ];
+  const existsStmt = db.prepare("SELECT id FROM activities WHERE name = ?");
+  const insertWithNotes = db.prepare(
+    "INSERT INTO activities (name, category, color, icon, sort_order, baseline_week, max_per_day, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+  );
+  for (const a of newActivities) {
+    const existing = existsStmt.get(a.name) as { id: number } | undefined;
+    if (!existing) {
+      insertWithNotes.run(a.name, a.category, a.color, a.icon, a.sort_order, a.baseline_week, a.max_per_day, a.notes);
+    }
   }
 }
 
@@ -106,14 +141,23 @@ export function findActivityByName(name: string): Activity | undefined {
   ).get(name) as Activity | undefined;
 }
 
-export function createActivity(data: { name: string; category: string; color: string; icon?: string; sort_order?: number; baseline_week?: number; max_per_day?: number }) {
+export function createActivity(data: { name: string; category: string; color: string; icon?: string; sort_order?: number; baseline_week?: number; max_per_day?: number; notes?: string | null }) {
   const result = getDb().prepare(
-    "INSERT INTO activities (name, category, color, icon, sort_order, baseline_week, max_per_day) VALUES (?, ?, ?, ?, ?, ?, ?)"
-  ).run(data.name, data.category, data.color, data.icon || null, data.sort_order || 0, data.baseline_week ?? null, data.max_per_day ?? 1);
+    "INSERT INTO activities (name, category, color, icon, sort_order, baseline_week, max_per_day, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+  ).run(
+    data.name,
+    data.category,
+    data.color,
+    data.icon || null,
+    data.sort_order || 0,
+    data.baseline_week ?? null,
+    data.max_per_day ?? 1,
+    data.notes ?? null,
+  );
   return result.lastInsertRowid;
 }
 
-export function updateActivity(id: number, data: { name?: string; category?: string; color?: string; icon?: string; sort_order?: number; active?: number }) {
+export function updateActivity(id: number, data: { name?: string; category?: string; color?: string; icon?: string; sort_order?: number; active?: number; baseline_week?: number | null; max_per_day?: number; notes?: string | null }) {
   const fields: string[] = [];
   const values: any[] = [];
   for (const [key, val] of Object.entries(data)) {
@@ -122,6 +166,7 @@ export function updateActivity(id: number, data: { name?: string; category?: str
       values.push(val);
     }
   }
+  if (fields.length === 0) return;
   values.push(id);
   getDb().prepare(`UPDATE activities SET ${fields.join(", ")} WHERE id = ?`).run(...values);
 }
@@ -205,6 +250,64 @@ export function setSetting(key: string, value: string) {
   getDb().prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run(key, value);
 }
 
+// Rating queries
+export function setRating(activityId: number, rating: number, today: string) {
+  if (rating < 1 || rating > 5) {
+    return { success: false as const, error: "Rating must be between 1 and 5" };
+  }
+  const latest = getDb()
+    .prepare("SELECT id, rated_on FROM activity_ratings WHERE activity_id = ? ORDER BY rated_on DESC, id DESC LIMIT 1")
+    .get(activityId) as { id: number; rated_on: string } | undefined;
+
+  if (latest && latest.rated_on === today) {
+    getDb()
+      .prepare("UPDATE activity_ratings SET rating = ?, updated_at = datetime('now') WHERE id = ?")
+      .run(rating, latest.id);
+    return { success: true as const, id: latest.id, inserted: false };
+  }
+
+  const res = getDb()
+    .prepare("INSERT INTO activity_ratings (activity_id, rating, rated_on) VALUES (?, ?, ?)")
+    .run(activityId, rating, today);
+  return { success: true as const, id: Number(res.lastInsertRowid), inserted: true };
+}
+
+export function getCurrentRatings(): Record<number, number> {
+  const rows = getDb()
+    .prepare(`
+      SELECT r.activity_id, r.rating
+      FROM activity_ratings r
+      JOIN (
+        SELECT activity_id, MAX(rated_on) AS max_on
+        FROM activity_ratings
+        GROUP BY activity_id
+      ) latest ON latest.activity_id = r.activity_id AND latest.max_on = r.rated_on
+      GROUP BY r.activity_id
+    `)
+    .all() as { activity_id: number; rating: number }[];
+  const out: Record<number, number> = {};
+  for (const row of rows) out[row.activity_id] = row.rating;
+  return out;
+}
+
+export function getRatingHistory(activityId: number): ActivityRating[] {
+  return getDb()
+    .prepare("SELECT * FROM activity_ratings WHERE activity_id = ? ORDER BY rated_on ASC, id ASC")
+    .all(activityId) as ActivityRating[];
+}
+
+export function getAllRatingHistory(): Record<number, ActivityRating[]> {
+  const rows = getDb()
+    .prepare("SELECT * FROM activity_ratings ORDER BY activity_id, rated_on ASC, id ASC")
+    .all() as ActivityRating[];
+  const grouped: Record<number, ActivityRating[]> = {};
+  for (const row of rows) {
+    if (!grouped[row.activity_id]) grouped[row.activity_id] = [];
+    grouped[row.activity_id].push(row);
+  }
+  return grouped;
+}
+
 // Types
 export interface Activity {
   id: number;
@@ -216,6 +319,7 @@ export interface Activity {
   active: number;
   baseline_week: number | null;
   max_per_day: number;
+  notes: string | null;
   created_at: string;
 }
 
@@ -243,4 +347,13 @@ export interface ReleaseSession {
   id: number;
   expires_at: string;
   created_at: string;
+}
+
+export interface ActivityRating {
+  id: number;
+  activity_id: number;
+  rating: number;
+  rated_on: string;
+  rated_at: string;
+  updated_at: string;
 }

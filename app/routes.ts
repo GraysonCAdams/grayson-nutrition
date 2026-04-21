@@ -9,6 +9,7 @@ export default [
   ]),
   route("api/entries", "routes/api.entries.tsx"),
   route("api/activities", "routes/api.activities.tsx"),
+  route("api/ratings", "routes/api.ratings.tsx"),
   route("api/review", "routes/api.review.tsx"),
   route("api/release", "routes/api.release.tsx"),
 ] satisfies RouteConfig;
