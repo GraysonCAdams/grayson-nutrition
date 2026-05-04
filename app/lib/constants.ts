@@ -85,8 +85,11 @@ export const SEED_ACTIVITIES: SeedActivity[] = [
   { name: "Work out at office", category: "weekly_challenge", color: "#2DD4BF", icon: "🏢", sort_order: 4, baseline_week: 3, max_per_day: 1, notes: null, time_of_day: "midday" },
   { name: "Work out at home", category: "weekly_challenge", color: "#F472B6", icon: "🏠", sort_order: 5, baseline_week: 3, max_per_day: 1, notes: null, time_of_day: "evening" },
   // Week 4
-  { name: "Mid-morning snack", category: "weekly_challenge", color: "#FBBF24", icon: "🥜", sort_order: 6, baseline_week: 4, max_per_day: 1, notes: null, time_of_day: "morning" },
+  { name: "Mid-morning hunger check-in", category: "weekly_challenge", color: "#FBBF24", icon: "🥜", sort_order: 6, baseline_week: 4, max_per_day: 1, notes: null, time_of_day: "morning" },
   { name: "More balanced dessert", category: "weekly_challenge", color: "#34D399", icon: "🍨", sort_order: 7, baseline_week: 4, max_per_day: 1, notes: null, time_of_day: "evening" },
   { name: "Reflect before dessert", category: "weekly_challenge", color: "#F472B6", icon: "🍰", sort_order: 8, baseline_week: 4, max_per_day: 1, notes: "because it tastes good is valid", time_of_day: "evening" },
   { name: "Bring a snack to work", category: "weekly_challenge", color: "#FB923C", icon: "🥨", sort_order: 9, baseline_week: 4, max_per_day: 1, notes: "chomp sticks + fruit, hummus cracker cups, chobani, banana", time_of_day: "morning" },
+  { name: "Eat lunch by 12:30 on workdays", category: "weekly_challenge", color: "#FCD34D", icon: "⏰", sort_order: 10, baseline_week: 4, max_per_day: 1, notes: "Mon–Fri", time_of_day: "midday" },
+  { name: "Grocery shop by Sunday morning", category: "weekly_challenge", color: "#818CF8", icon: "🛒", sort_order: 11, baseline_week: 4, max_per_day: 1, notes: "weekly", time_of_day: "morning" },
+  { name: "Cook by Monday", category: "weekly_challenge", color: "#F87171", icon: "🥘", sort_order: 12, baseline_week: 4, max_per_day: 1, notes: "weekly", time_of_day: "anytime" },
 ];
