@@ -305,6 +305,12 @@ export function setRating(activityId: number, rating: number, today: string) {
 }
 
 export function getCurrentRatings(): Record<number, number> {
+  // Ratings clear from the client view 2 days after they were made (history is still
+  // preserved in activity_ratings). Visible window = today + yesterday.
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 1);
+  const cutoffStr = cutoff.toISOString().split("T")[0];
+
   const rows = getDb()
     .prepare(`
       SELECT r.activity_id, r.rating
@@ -312,11 +318,12 @@ export function getCurrentRatings(): Record<number, number> {
       JOIN (
         SELECT activity_id, MAX(rated_on) AS max_on
         FROM activity_ratings
+        WHERE rated_on >= ?
         GROUP BY activity_id
       ) latest ON latest.activity_id = r.activity_id AND latest.max_on = r.rated_on
       GROUP BY r.activity_id
     `)
-    .all() as { activity_id: number; rating: number }[];
+    .all(cutoffStr) as { activity_id: number; rating: number }[];
   const out: Record<number, number> = {};
   for (const row of rows) out[row.activity_id] = row.rating;
   return out;

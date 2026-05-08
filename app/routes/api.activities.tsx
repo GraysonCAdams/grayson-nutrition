@@ -1,6 +1,5 @@
 import { data } from "react-router";
 import { getAllActivities, createActivity, updateActivity, deleteActivity } from "~/lib/db.server";
-import { isNutritionistAuthenticated } from "~/lib/session.server";
 import type { Route } from "./+types/api.activities";
 
 export async function loader(_: Route.LoaderArgs) {
@@ -8,11 +7,6 @@ export async function loader(_: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  const isAuth = await isNutritionistAuthenticated(request);
-  if (!isAuth) {
-    return data({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const formData = await request.formData();
   const intent = formData.get("intent");
 
