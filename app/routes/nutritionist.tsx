@@ -542,42 +542,45 @@ function DiaryEntry({
 
   return (
     <article
-      className="relative mt-2 rounded-3xl bg-[#FFFBF4]/95 backdrop-blur border border-stone-200/80 shadow-[0_30px_60px_-30px_rgba(120,53,15,0.18)] overflow-hidden"
+      className="relative mt-2 rounded-3xl bg-[#FFFBF4]/95 backdrop-blur border border-stone-200/70 shadow-[0_30px_60px_-30px_rgba(120,53,15,0.18)] overflow-hidden"
     >
-      {/* Decorative top ribbon */}
+      {/* Hairline accent — the rainbow ribbon dialed back */}
       <div
         aria-hidden
-        className="absolute inset-x-0 top-0 h-1.5"
+        className="absolute inset-x-0 top-0 h-px"
         style={{
           background:
-            "linear-gradient(90deg, #FBBF24 0%, #F472B6 35%, #818CF8 70%, #34D399 100%)",
-        }}
-      />
-      {/* Subtle paper rule lines */}
-      <div
-        aria-hidden
-        className="absolute inset-0 pointer-events-none opacity-[0.5]"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(to bottom, transparent 0, transparent 31px, rgba(120,53,15,0.05) 32px)",
+            "linear-gradient(90deg, transparent 0%, #FBBF24 18%, #F472B6 50%, #818CF8 82%, transparent 100%)",
+          opacity: 0.7,
         }}
       />
 
-      <div className="relative px-4 sm:px-7 pt-6 sm:pt-7 pb-5 sm:pb-7">
-        <div className="flex items-baseline justify-between gap-3 flex-wrap">
-          <div>
+      <div className="relative px-5 sm:px-8 pt-6 sm:pt-8 pb-5 sm:pb-7">
+        <header className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="min-w-0">
+            {isToday && (
+              <span className="inline-flex items-center gap-1.5 mb-2 px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 text-[10px] font-bold uppercase tracking-[0.16em]">
+                <span aria-hidden className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                today
+              </span>
+            )}
             <h3
-              className="text-2xl sm:text-3xl text-stone-900 leading-tight"
-              style={{ fontFamily: "Fraunces, serif", fontStyle: "italic", fontWeight: 500 }}
+              className="text-stone-900 leading-[1.05] tracking-tight"
+              style={{
+                fontFamily: "Fraunces, serif",
+                fontStyle: "italic",
+                fontWeight: 500,
+                fontSize: "clamp(1.5rem, 4.5vw, 2rem)",
+              }}
             >
               {longDate}
+              <span className="ml-2 text-stone-400 tabular-nums not-italic font-normal text-[0.55em] align-baseline">
+                {year}
+              </span>
             </h3>
-            <p className="text-stone-500 text-xs sm:text-sm mt-0.5 tabular-nums">
-              {year} {isToday && <span className="text-rose-500 font-semibold">· today</span>}
-            </p>
           </div>
           <DayStat totalRated={totalRated} avg={avg} />
-        </div>
+        </header>
 
         <div className="mt-5 sm:mt-6 space-y-4 sm:space-y-5">
           {totalRated === 0 && (
@@ -613,47 +616,45 @@ function DiaryEntry({
 function DayStat({ totalRated, avg }: { totalRated: number; avg: number }) {
   if (totalRated === 0) {
     return (
-      <span
-        className="text-stone-400 text-xs uppercase tracking-[0.18em]"
-      >
-        empty page
+      <span className="text-stone-400 text-[11px] tracking-wide italic"
+        style={{ fontFamily: "Fraunces, serif" }}>
+        unwritten
       </span>
     );
   }
+  const pct = Math.max(0, Math.min(100, (avg / 5) * 100));
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex flex-col items-end">
-        <span
-          className="text-[10px] uppercase tracking-[0.18em] text-stone-400 font-semibold"
-        >
-          avg
-        </span>
-        <div className="flex items-center gap-0.5">
-          {[1, 2, 3, 4, 5].map((n) => {
-            const filled = avg >= n - 0.25;
-            const half = !filled && avg >= n - 0.75;
-            return (
-              <span
-                key={n}
-                aria-hidden
-                className={`text-sm leading-none ${filled || half ? "text-amber-400" : "text-stone-300"}`}
-              >
-                {filled ? "★" : half ? "⯨" : "☆"}
-              </span>
-            );
-          })}
-        </div>
-      </div>
-      <div className="w-px h-7 bg-stone-200" />
-      <div className="flex flex-col items-end">
-        <span className="text-[10px] uppercase tracking-[0.18em] text-stone-400 font-semibold">
-          rated
-        </span>
-        <span className="text-base font-extrabold text-stone-800 tabular-nums leading-none">
-          {totalRated}
-        </span>
-      </div>
+    <div className="inline-flex items-center gap-2.5 rounded-full bg-white/70 backdrop-blur border border-stone-200/70 pl-2.5 pr-3 py-1.5">
+      <FractionalStars value={avg} />
+      <span className="text-stone-800 text-sm font-bold tabular-nums leading-none">
+        {avg.toFixed(1)}
+      </span>
+      <span aria-hidden className="text-stone-300 leading-none">·</span>
+      <span className="text-stone-500 text-[11px] tabular-nums leading-none">
+        {totalRated} <span className="text-stone-400">{totalRated === 1 ? "rated" : "rated"}</span>
+      </span>
+      <span className="sr-only">average {avg.toFixed(1)} of 5 across {totalRated} ratings</span>
+      <span aria-hidden className="hidden">{pct}</span>
     </div>
+  );
+}
+
+function FractionalStars({ value }: { value: number }) {
+  const pct = Math.max(0, Math.min(100, (value / 5) * 100));
+  return (
+    <span
+      className="relative inline-block leading-none align-middle"
+      aria-hidden
+      style={{ fontSize: "14px", letterSpacing: "1px" }}
+    >
+      <span className="text-stone-300 select-none">★★★★★</span>
+      <span
+        className="absolute left-0 top-0 overflow-hidden text-amber-400 select-none"
+        style={{ width: `${pct}%` }}
+      >
+        ★★★★★
+      </span>
+    </span>
   );
 }
 
