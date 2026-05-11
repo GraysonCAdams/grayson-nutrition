@@ -144,6 +144,7 @@ function migrate(db: Database.Database) {
     { name: "Eat lunch by 12:30 on workdays", category: "weekly_challenge", color: "#FCD34D", icon: "⏰", sort_order: 10, baseline_week: 4, max_per_day: 1, notes: "Mon–Fri", time_of_day: "midday" },
     { name: "Grocery shop by Sunday morning", category: "weekly_challenge", color: "#818CF8", icon: "🛒", sort_order: 11, baseline_week: 4, max_per_day: 1, notes: "weekly", time_of_day: "morning" },
     { name: "Cook by Monday", category: "weekly_challenge", color: "#F87171", icon: "🥘", sort_order: 12, baseline_week: 4, max_per_day: 1, notes: "weekly", time_of_day: "anytime" },
+    { name: "Protein with cinnamon rolls", category: "weekly_challenge", color: "#A78BFA", icon: "🍩", sort_order: 13, baseline_week: 4, max_per_day: 1, notes: "Mondays", time_of_day: "morning" },
   ];
   const existsStmt = db.prepare("SELECT id FROM activities WHERE name = ?");
   const insertFull = db.prepare(
