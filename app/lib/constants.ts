@@ -93,4 +93,5 @@ export const SEED_ACTIVITIES: SeedActivity[] = [
   { name: "Grocery shop by Sunday morning", category: "weekly_challenge", color: "#818CF8", icon: "🛒", sort_order: 11, baseline_week: 4, max_per_day: 1, notes: "weekly", time_of_day: "morning" },
   { name: "Cook by Monday", category: "weekly_challenge", color: "#F87171", icon: "🥘", sort_order: 12, baseline_week: 4, max_per_day: 1, notes: "weekly", time_of_day: "anytime" },
   { name: "Protein with cinnamon rolls", category: "weekly_challenge", color: "#A78BFA", icon: "🍩", sort_order: 13, baseline_week: 4, max_per_day: 1, notes: "Mondays", time_of_day: "morning" },
+  { name: "Yogurt in the morning", category: "weekly_challenge", color: "#2DD4BF", icon: "🥣", sort_order: 14, baseline_week: 4, max_per_day: 1, notes: null, time_of_day: "morning" },
 ];
